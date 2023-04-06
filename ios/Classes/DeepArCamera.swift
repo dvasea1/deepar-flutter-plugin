@@ -68,6 +68,7 @@ class DeepARCameraView: NSObject, FlutterPlatformView, DeepARDelegate {
     
     private var pictureQuality:PictureQuality!
     private var licenseKey:String!
+    private var videoRecordingWarmupEnabled:Bool!
     private var videoFilePath:String!
     private var screenshotFilePath:String!
     
@@ -86,6 +87,7 @@ class DeepARCameraView: NSObject, FlutterPlatformView, DeepARDelegate {
         self.registrar = registrar
         if let dict = args as? [String: Any] {
             self.licenseKey = (dict["license_key"] as? String ?? "")
+            self.videoRecordingWarmupEnabled = (dict["videoRecordingWarmupEnabled"] as? Bool ?? true)
             self.pictureQuality = PictureQuality.init(rawValue: dict["resolution"] as? String ?? "medium")
         }
         channel = FlutterMethodChannel(name: "deep_ar/view/" + String(viewId), binaryMessenger: messenger!);
@@ -206,6 +208,10 @@ class DeepARCameraView: NSObject, FlutterPlatformView, DeepARDelegate {
             result("changeParameter called successfully")
             
         case "destroy":
+            if(deepAR.videoRecordingWarmupEnabled) {
+                deepAR.finishVideoRecording()
+                deepAR.videoRecordingWarmupEnabled = false
+            }
             cameraController.stopCamera()
             deepAR.shutdown()
             result("SHUTDOWN");
@@ -229,7 +235,7 @@ class DeepARCameraView: NSObject, FlutterPlatformView, DeepARDelegate {
         cameraController.preset = presetForPictureQuality(pictureQuality: pictureQuality);
         cameraController.videoOrientation = .portrait;
         cameraController.deepAR = self.deepAR
-        self.deepAR.videoRecordingWarmupEnabled = false;
+        self.deepAR.videoRecordingWarmupEnabled = self.videoRecordingWarmupEnabled;
         
         
         deepAR.changeLiveMode(true);
@@ -277,10 +283,15 @@ class DeepARCameraView: NSObject, FlutterPlatformView, DeepARDelegate {
     
     
     func startRecordingVideo(){
-        let width: Int32 = Int32(deepAR.renderingResolution.width)
-        let height: Int32 =  Int32(deepAR.renderingResolution.height)
-        
-        deepAR.startVideoRecording(withOutputWidth: width, outputHeight: height)
+        if(deepAR.videoRecordingWarmupEnabled) {
+           deepAR.resumeVideoRecording()
+            videoResult(callerResponse: DeepArResponse.videoStarted, message: "video started")
+       } else {
+            let width: Int32 = Int32(deepAR.renderingResolution.width)
+            let height: Int32 =  Int32(deepAR.renderingResolution.height)
+
+            deepAR.startVideoRecording(withOutputWidth: width, outputHeight: height)
+       }
         isRecordingInProcess = true
     }
     
@@ -288,13 +299,26 @@ class DeepARCameraView: NSObject, FlutterPlatformView, DeepARDelegate {
         deepAR.finishVideoRecording();
     }
     
+    func didInitialize() {
+       if (deepAR.videoRecordingWarmupEnabled) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(300)) {
+                let width: Int32 = Int32(self.deepAR.renderingResolution.width)
+                let height: Int32 =  Int32(self.deepAR.renderingResolution.height)
+
+                self.deepAR.startVideoRecording(withOutputWidth: width, outputHeight: height)
+            }
+       }
+
+   }
     func didFinishPreparingForVideoRecording() {
         NSLog("didFinishPreparingForVideoRecording!!!!!")
     }
     
     func didStartVideoRecording() {
         NSLog("didStartVideoRecording!!!!!")
-        videoResult(callerResponse: DeepArResponse.videoStarted, message: "video started")
+        if(!deepAR.videoRecordingWarmupEnabled) {
+            videoResult(callerResponse: DeepArResponse.videoStarted, message: "video started")
+       }
     }
     
     func recordingFailedWithError(_ error: Error!) {

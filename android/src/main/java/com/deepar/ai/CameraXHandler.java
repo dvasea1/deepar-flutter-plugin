@@ -12,6 +12,7 @@ import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
+import androidx.camera.core.Preview;
 import androidx.camera.core.TorchState;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.core.content.ContextCompat;
@@ -52,6 +53,8 @@ public class CameraXHandler implements MethodChannel.MethodCallHandler {
     private int lensFacing = defaultLensFacing;
     private Camera camera;
 
+    private ARSurfaceProvider surfaceProvider = null;
+    private static final boolean useExternalCameraTexture = true;
 
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull MethodChannel.Result result) {
@@ -182,18 +185,32 @@ public class CameraXHandler implements MethodChannel.MethodCallHandler {
 
                     CameraSelector cameraSelector = new CameraSelector.Builder().requireLensFacing(lensFacing).build();
 
-                    ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
-                            .setTargetResolution(cameraResolution)
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build();
+                    if (useExternalCameraTexture) {
+                        //////////// Use external Camera Texture
+                        Preview preview = (new Preview.Builder()).setTargetResolution(cameraResolution).build();
+                        processCameraProvider.unbindAll();
+                        camera = processCameraProvider.bindToLifecycle((LifecycleOwner) activity,
+                                cameraSelector, preview);
+                        if (surfaceProvider == null) {
+                            surfaceProvider = new ARSurfaceProvider(activity, deepAR);
+                        }
+                        preview.setSurfaceProvider(surfaceProvider);
+                        surfaceProvider.setMirror(lensFacing == CameraSelector.LENS_FACING_FRONT);
+                    } else {
+                        //////////// Not Use external Camera Texture
+                        ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
+                                .setTargetResolution(cameraResolution)
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build();
 
-                    imageAnalysis.setAnalyzer(executor, analyzer);
+                        imageAnalysis.setAnalyzer(executor, analyzer);
 
-                    processCameraProvider.unbindAll();
+                        processCameraProvider.unbindAll();
 
-                    camera = processCameraProvider.bindToLifecycle((LifecycleOwner) activity,
-                            cameraSelector, imageAnalysis);
-
+                        camera = processCameraProvider.bindToLifecycle((LifecycleOwner) activity,
+                                cameraSelector, imageAnalysis);
+                    }
+                    ////////////////////////////////////////////////////////////////////////
                     if (result != null) {
                         result.success(textureId);
                     }
@@ -215,6 +232,14 @@ public class CameraXHandler implements MethodChannel.MethodCallHandler {
             cameraProvider = future.get();
             cameraProvider.unbindAll();
         } catch (ExecutionException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        try {
+            if (surfaceProvider != null) {
+                surfaceProvider.stop();
+                surfaceProvider = null;
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
         deepAR.setAREventListener(null);

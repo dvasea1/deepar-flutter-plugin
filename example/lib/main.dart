@@ -64,9 +64,9 @@ class _HomeState extends State<Home> {
     _controller = DeepArController();
     _controller
         .initialize(
-          androidLicenseKey: "---android key---",
-          iosLicenseKey: "---iOS key---",
-          resolution: Resolution.high,
+          androidLicenseKey: "5513eae77af88bf2e51e9dc6d55b49320a1e4b79ad0029f814fdc8a9e27c0aca655e73b0faec4841",
+          iosLicenseKey: "d62164ae6222105ea129899d33219be1b475a710a825f15ae6b66f5f57df9371ff1f4e196c6fd6d8",
+          resolution: Resolution.veryHigh,
         )
         .then((value) => setState(() {}));
     super.initState();
@@ -147,13 +147,21 @@ class _HomeState extends State<Home> {
           ),
           IconButton(
             onPressed: () async {
-              _isFilter = !_isFilter;
-              if (_isFilter) {
-                _controller.switchFilter(_filterList[_filterIndex]);
-              } else {
-                _controller.switchFilter("null");
+              try {
+                // final DeepArController? oldController = _controller;
+                // _controller = null;
+                await _controller.destroy();
+                debugPrint("------======= destroy");
+              } catch(e) {
+                debugPrint("destroy exception: $e");
               }
-              setState(() {});
+              // _isFilter = !_isFilter;
+              // if (_isFilter) {
+              //   _controller.switchFilter(_filterList[_filterIndex]);
+              // } else {
+              //   _controller.switchFilter("null");
+              // }
+              // setState(() {});
             },
             color: Colors.white70,
             iconSize: 40,
