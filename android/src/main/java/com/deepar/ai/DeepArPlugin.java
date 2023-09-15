@@ -36,6 +36,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.view.TextureRegistry;
 import ai.deepar.ar.DeepAR;
+
 import java.io.FileInputStream;
 
 import android.content.res.AssetManager;
@@ -478,20 +479,25 @@ public class DeepArPlugin implements FlutterPlugin, AREventListener, ActivityAwa
     }
 
     /// Access flutter level assets in native android
-    if (path.equals("none")) {
-        return null;
-    }
+    InputStream _getAssetFileInputStream(String path) throws IOException {
+
+        if (path.equals("none")) {
+            return null;
+        }
         System.out.println(path);
 
         try {
-        if (path.contains("assets")) {
-            String assetPath = flutterPlugin.getFlutterAssets().getAssetFilePathBySubpath(path);
-            return flutterPlugin.getApplicationContext().getAssets().open(assetPath);
-        } else {
-            return new FileInputStream(new File(path));
+            if (path.contains("assets")) {
+                String assetPath = flutterPlugin.getFlutterAssets().getAssetFilePathBySubpath(path);
+                return flutterPlugin.getApplicationContext().getAssets().open(assetPath);
+            } else {
+                return new FileInputStream(new File(path));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
         }
-    } catch (IOException e) {
-        e.printStackTrace();
-        return null;
+
+
     }
 }
